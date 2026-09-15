@@ -24,7 +24,7 @@ jobs:
 
       - name: Build .app with PyInstaller
         run: |
-          pyinstaller --noconfirm --onedir --windowed --add-data "app_icon.png:." --collect-all tkinterdnd2 app.py
+          pyinstaller --noconfirm --onedir --windowed --add-data "app_icon.ico:." --collect-all tkinterdnd2 app.py
 
       - name: Create .dmg
         run: |
