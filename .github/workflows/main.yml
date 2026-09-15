@@ -24,12 +24,12 @@ jobs:
 
       - name: Build .app with PyInstaller
         run: |
-          pyinstaller --noconfirm --onedir --windowed --add-data "app_icon.png:." --collect-all tkinterdnd2 app_2.py
+          pyinstaller --noconfirm --onedir --windowed --add-data "app_icon.png:." --collect-all tkinterdnd2 app.py
 
       - name: Create .dmg
         run: |
           brew install create-dmg
-          create-dmg --volname "MiCO File Converter" --window-size 800 400 --app-drop-link 600 185 "MiCO_Setup.dmg" "dist/app_2.app"
+          create-dmg --volname "MiCO File Converter" --window-size 800 400 --app-drop-link 600 185 "MiCO_Setup.dmg" "dist/app.app"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
