@@ -2841,7 +2841,6 @@
    'C:\\Users\\R\\AppData\\Local\\Programs\\Python\\Python314\\DLLs\\_zstd.pyd',
    'EXTENSION'),
   ('app.exe', 'C:\\MiCO\\build\\app\\app.exe', 'EXECUTABLE'),
-  ('app_icon.ico', 'C:\\MiCO\\app_icon.ico', 'DATA'),
   ('base_library.zip', 'C:\\MiCO\\build\\app\\base_library.zip', 'DATA'),
   ('charset_normalizer\\cd.cp314-win_amd64.pyd',
    'C:\\MiCO\\.venv\\Lib\\site-packages\\charset_normalizer\\cd.cp314-win_amd64.pyd',
