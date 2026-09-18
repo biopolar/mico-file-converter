@@ -87,6 +87,7 @@ TOOLS_DATA = [
     {"id": "IMAGE_TO_WORD", "title": "JPG to Word", "desc": "Convert JPG images into editable Word documents using OCR.", "badge": "JPG", "cat": "Convert from PDF"},
     {"id": "PROTECT_PDF", "title": "Protect PDF", "desc": "Add password protection and permissions to keep PDFs secure.", "badge": "PDF", "cat": "PDF Tools"},
     {"id": "UNLOCK_PDF", "title": "Unlock PDF", "desc": "Remove password protection and restrictions from PDF files.", "badge": "PDF", "cat": "PDF Tools"},
+    {"id": "COMING_SOON", "title": "More Tools Soon", "desc": "New conversion features are under development and will be available in future updates.", "badge": "SOON", "cat": "PDF Tools", "disabled": True},
 ]
 
 class MiCOApp:
@@ -95,7 +96,6 @@ class MiCOApp:
         self.root.title("MiCO File Converter Dashboard")
         self.root.configure(bg="#fcface")
         
-        # Set ikon jendela aplikasi
         self._set_app_icon()
 
         self.root.geometry("1180x780")
@@ -298,13 +298,16 @@ class MiCOApp:
             row = idx // cols
             col = idx % cols
 
+            is_disabled = tool.get("disabled", False)
+            card_cursor = "no" if is_disabled else "hand2"
+
             card = tk.Frame(
                 self.grid_scroll,
                 bg="#f5f5f2",
                 highlightthickness=1,
                 highlightbackground="#E2E8F0",
                 height=165,
-                cursor="hand2"
+                cursor=card_cursor
             )
             card.grid(row=row, column=col, padx=8, pady=8, sticky="ew")
             card.pack_propagate(False)
@@ -317,15 +320,24 @@ class MiCOApp:
                 text=tool["title"], 
                 font=("Segoe UI", 11, "bold"), 
                 bg="#f5f5f2",
-                fg="#0F172A",
+                fg="#64748B" if is_disabled else "#0F172A",
                 anchor="w"
             )
             lbl_title.pack(side="left", fill="x", expand=True)
 
             is_pdf = (tool["badge"] == "PDF")
-            badge_bg = "#FEE2E2" if is_pdf else "#E0F2FE"
-            badge_fg = "#B91C1C" if is_pdf else "#0369A1"
-            hover_border_color = "#EF4444" if is_pdf else "#2563EB"
+            if is_disabled:
+                badge_bg = "#E2E8F0"
+                badge_fg = "#64748B"
+                hover_border_color = "#E2E8F0"
+            elif is_pdf:
+                badge_bg = "#FEE2E2"
+                badge_fg = "#B91C1C"
+                hover_border_color = "#EF4444"
+            else:
+                badge_bg = "#E0F2FE"
+                badge_fg = "#0369A1"
+                hover_border_color = "#2563EB"
 
             badge = tk.Label(
                 top_f, 
@@ -343,20 +355,24 @@ class MiCOApp:
                 text=tool["desc"], 
                 font=("Segoe UI", 9), 
                 bg="#f5f5f2",
-                fg="#64748B", 
+                fg="#94A3B8" if is_disabled else "#64748B", 
                 justify="left",
                 anchor="nw",
                 wraplength=200
             )
             desc_label.pack(fill="both", expand=True, padx=14, pady=(2, 8))
 
-            def on_enter(e, c=card, h_color=hover_border_color):
-                c.configure(highlightbackground=h_color, highlightthickness=2)
+            def on_enter(e, c=card, h_color=hover_border_color, disabled=is_disabled):
+                if not disabled:
+                    c.configure(highlightbackground=h_color, highlightthickness=2)
 
             def on_leave(e, c=card):
                 c.configure(highlightbackground="#E2E8F0", highlightthickness=1)
 
-            click_action = lambda e, t=tool: self.open_tool_page(t)
+            if is_disabled:
+                click_action = lambda e: messagebox.showinfo("Feature Coming Soon", "Fitur ini sedang dalam tahap pengembangan dan akan segera hadir pada pembaruan berikutnya!")
+            else:
+                click_action = lambda e, t=tool: self.open_tool_page(t)
 
             for widget in (card, top_f, lbl_title, badge, desc_label):
                 widget.bind("<Enter>", on_enter)
@@ -882,12 +898,13 @@ class MiCOApp:
                     if os.path.abspath(src_path) == os.path.abspath(dest_path):
                         continue
 
-                    shutil.copy2(src_path, dest_path)
+                    # Menggunakan shutil.move agar file dipindahkan dan tidak menyisakan duplikat
+                    shutil.move(src_path, dest_path)
 
-                messagebox.showinfo("Berhasil", f"File berhasil disimpan ke:\n{target_folder}")
+                messagebox.showinfo("Berhasil", f"File berhasil dipindahkan ke:\n{target_folder}")
                 open_folder(target_folder)
             except Exception as e:
-                messagebox.showerror("Error", f"Gagal menyimpan file: {e}\n\nPastikan file tidak sedang dibuka di aplikasi lain.")
+                messagebox.showerror("Error", f"Gagal memindahkan file: {e}\n\nPastikan file tidak sedang dibuka di aplikasi lain.")
 
 if __name__ == "__main__":
     root = TkinterDnD.Tk()
