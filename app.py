@@ -415,7 +415,15 @@ class MiCOApp:
         except Exception:
             pass
 
-        self.file_list_frame = ctk.CTkScrollableFrame(self.center_wrapper, fg_color="transparent", height=340)
+        # Wadah daftar file bergaris tepi (bordered container)
+        self.file_list_frame = ctk.CTkScrollableFrame(
+            self.center_wrapper,
+            fg_color="#FFFFFF",
+            border_color="#CBD5E1",
+            border_width=1,
+            corner_radius=12,
+            height=320
+        )
 
         self.btn_convert = ctk.CTkButton(
             self.center_wrapper,
@@ -504,19 +512,19 @@ class MiCOApp:
         self.btn_convert.configure(state="normal", text=f"Convert Now ({len(self.selected_files)} File)", fg_color="#2563EB")
 
         top_info = ctk.CTkFrame(self.file_list_frame, fg_color="transparent")
-        top_info.pack(fill="x", pady=(0, 5))
+        top_info.pack(fill="x", pady=(4, 8), padx=4)
         ctk.CTkLabel(top_info, text=f"{len(self.selected_files)} file(s) selected", font=ctk.CTkFont(size=13, weight="bold"), text_color="#0F172A").pack(side="left")
         ctk.CTkButton(top_info, text="Clear all", fg_color="transparent", text_color="#EF4444", hover_color="#FEE2E2", width=60, font=ctk.CTkFont(size=12), command=self._clear_all_files).pack(side="right")
 
         for f in self.selected_files:
-            f_card = ctk.CTkFrame(self.file_list_frame, fg_color="#f5f5f2", corner_radius=8, border_width=1, border_color="#E2E8F0", height=42)
-            f_card.pack(fill="x", pady=3)
+            f_card = ctk.CTkFrame(self.file_list_frame, fg_color="#F8FAFC", corner_radius=8, border_width=1, border_color="#E2E8F0", height=42)
+            f_card.pack(fill="x", pady=3, padx=4)
             f_card.pack_propagate(False)
 
             size_mb = round(os.path.getsize(f) / (1024 * 1024), 2) if os.path.exists(f) else 0
             ctk.CTkLabel(f_card, text=f"📄  {os.path.basename(f)}", font=ctk.CTkFont(size=13, weight="bold"), text_color="#0F172A").pack(side="left", padx=12)
             ctk.CTkLabel(f_card, text=f"{size_mb} MB", font=ctk.CTkFont(size=12), text_color="#64748B").pack(side="left", padx=10)
-            ctk.CTkButton(f_card, text="✕", fg_color="transparent", text_color="#94A3B8", hover_color="#F1F5F9", width=30, command=lambda path=f: self._remove_single_file(path)).pack(side="right", padx=8)
+            ctk.CTkButton(f_card, text="✕", fg_color="transparent", text_color="#94A3B8", hover_color="#E2E8F0", width=30, command=lambda path=f: self._remove_single_file(path)).pack(side="right", padx=8)
 
     def _remove_single_file(self, path):
         if path in self.selected_files:
