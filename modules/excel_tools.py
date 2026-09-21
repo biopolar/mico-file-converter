@@ -1,4 +1,5 @@
 import os
+import re
 import pythoncom
 import win32com.client
 import pdfplumber
@@ -65,7 +66,7 @@ def convert_excel_to_pdf(input_files, output_directory="", status_callback=None)
 
 
 def convert_pdf_to_excel(input_files, output_directory="", status_callback=None):
-    """Mengonversi tabel/teks dari file PDF ke file Excel (.xlsx)."""
+    """Mengonversi seluruh isi file PDF (teks & tabel utuh) ke file Excel (.xlsx)."""
     total = len(input_files)
     success_count = 0
     last_error = ""
@@ -87,24 +88,26 @@ def convert_pdf_to_excel(input_files, output_directory="", status_callback=None)
 
         try:
             wb = openpyxl.Workbook()
-            # Hapus sheet default
-            wb.remove(wb.active)
+            wb.remove(wb.active)  # Hapus sheet default
 
             with pdfplumber.open(input_path) as pdf:
                 for p_idx, page in enumerate(pdf.pages, start=1):
                     ws = wb.create_sheet(title=f"Page_{p_idx}")
-                    tables = page.extract_tables()
+                    
+                    # Membaca seluruh isi halaman dengan mempertahankan tata letak posisi
+                    text = page.extract_text(layout=True)
 
-                    if tables:
-                        for table in tables:
-                            for row in table:
-                                ws.append([cell if cell is not None else "" for cell in row])
-                            ws.append([]) # Baris kosong pemisah antar tabel
-                    else:
-                        text = page.extract_text()
-                        if text:
-                            for line in text.split("\n"):
-                                ws.append([line])
+                    if text:
+                        for line in text.split("\n"):
+                            line_clean = line.rstrip()
+                            if not line_clean:
+                                continue
+                            
+                            # Memisahkan baris menjadi kolom berdasarkan spasi ganda/jarak antar teks
+                            columns = [col.strip() for col in re.split(r'\s{2,}', line_clean) if col.strip()]
+                            
+                            if columns:
+                                ws.append(columns)
 
             wb.save(output_path)
             if os.path.exists(output_path):
