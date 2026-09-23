@@ -3,17 +3,26 @@ warnings.filterwarnings("ignore")
 
 import sys
 import types
-import tkinter as tk
-import ctypes
 import os
 import shutil
 import time
 import subprocess
+import ctypes
+import threading
+
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+except Exception:
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
+import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 
 def get_resource_path(relative_path):
-    """Mendapatkan path absolut untuk resource, berlaku saat run script atau PyInstaller exe."""
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
@@ -28,14 +37,6 @@ def open_folder(path):
             subprocess.call(["xdg-open", path])
     except Exception as e:
         print(f"Gagal membuka folder: {e}")
-
-try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(2)
-except Exception:
-    try:
-        ctypes.windll.user32.SetProcessDpiAware()
-    except Exception:
-        pass
 
 if not hasattr(tk, "tix"):
     dummy_tix = types.ModuleType("tix")
@@ -54,6 +55,43 @@ except Exception as e:
 
 ctk.set_appearance_mode("Light")
 ctk.set_default_color_theme("blue")
+
+PALETTE = {
+    "BLUE": "#058CD7",   
+    "GREEN": "#00995E",  
+    "CREAM": "#D97706",  
+    "RED": "#FD5A46",    
+    "PINK": "#DB2777",   
+    "PURPLE": "#552CB7", 
+    "DISABLE": "#94A3B8"
+}
+
+TOOL_COLOR_MAP = {
+    "WORD_TO_PDF": PALETTE["BLUE"],
+    "EXCEL_TO_PDF": PALETTE["GREEN"],
+    "PPT_TO_PDF": PALETTE["CREAM"],
+    "PDF_TO_WORD": PALETTE["RED"],
+    "PDF_TO_EXCEL": PALETTE["GREEN"],
+    "PDF_TO_PPT": PALETTE["CREAM"],
+    "MERGE_PDF": PALETTE["PURPLE"],
+    "SPLIT_PDF": PALETTE["PURPLE"],
+    "COMPRESS_PDF": PALETTE["PURPLE"],
+    "IMAGE_TO_PDF": PALETTE["PINK"],
+    "PDF_TO_IMAGE": PALETTE["PINK"],
+    "IMAGE_TO_WORD": PALETTE["PINK"],
+    "PROTECT_PDF": PALETTE["RED"],
+    "UNLOCK_PDF": PALETTE["RED"],
+    "COMING_SOON": PALETTE["DISABLE"]
+}
+
+BADGE_ICON_MAP = {
+    "DOCX": "📝",
+    "XLSX": "📊",
+    "PPTX": "📙",
+    "PDF": "📄",
+    "JPG": "🖼️",
+    "SOON": "⏳"
+}
 
 TOOL_FILTER_MAP = {
     "WORD_TO_PDF": ([("Word Documents", "*.docx *.doc")], [".docx", ".doc"]),
@@ -84,7 +122,7 @@ TOOLS_DATA = [
     {"id": "COMPRESS_PDF", "title": "Compress PDF", "desc": "Reduce PDF file size without sacrificing readability.", "badge": "PDF", "cat": "PDF Tools"},
     {"id": "IMAGE_TO_PDF", "title": "JPG to PDF", "desc": "Package one or more JPG images into a clean PDF file.", "badge": "JPG", "cat": "Convert to PDF"},
     {"id": "PDF_TO_IMAGE", "title": "PDF to JPG", "desc": "Extract high-resolution images from each page of any PDF.", "badge": "PDF", "cat": "Convert from PDF"},
-    {"id": "IMAGE_TO_WORD", "title": "JPG to Word", "desc": "Convert JPG images into editable Word documents using OCR.", "badge": "JPG", "cat": "Convert from PDF"},
+    {"id": "IMAGE_TO_WORD", "title": "JPG to Word", "desc": "Convert JPG images into editable Word documents using OCR.", "badge": "JPG", "cat": "Convert to PDF"},
     {"id": "PROTECT_PDF", "title": "Protect PDF", "desc": "Add password protection and permissions to keep PDFs secure.", "badge": "PDF", "cat": "PDF Tools"},
     {"id": "UNLOCK_PDF", "title": "Unlock PDF", "desc": "Remove password protection and restrictions from PDF files.", "badge": "PDF", "cat": "PDF Tools"},
     {"id": "COMING_SOON", "title": "More Tools Soon", "desc": "New conversion features are under development and will be available in future updates.", "badge": "SOON", "cat": "PDF Tools", "disabled": True},
@@ -94,7 +132,7 @@ class MiCOApp:
     def __init__(self, root):
         self.root = root
         self.root.title("MiCO File Converter Dashboard")
-        self.root.configure(bg="#fcface")
+        self.root.configure(bg="#EFDDBE")
         
         self._set_app_icon()
 
@@ -120,8 +158,11 @@ class MiCOApp:
         self._last_state = self.root.state()
         self.is_converting = False
 
-        self.container = ctk.CTkFrame(self.root, fg_color="#fcface")
-        self.container.pack(fill="both", expand=True)
+        self.bg_canvas = tk.Canvas(self.root, highlightthickness=0, bd=0, bg="#EFDDBE")
+        self.bg_canvas.pack(fill="both", expand=True)
+
+        self.container = ctk.CTkFrame(self.bg_canvas, fg_color="transparent")
+        self.container_window = self.bg_canvas.create_window((0, 0), window=self.container, anchor="nw")
 
         self.dashboard_frame = ctk.CTkFrame(self.container, fg_color="transparent")
         self.tool_frame = ctk.CTkFrame(self.container, fg_color="transparent")
@@ -131,7 +172,13 @@ class MiCOApp:
         self._build_tool_ui()
         self.show_dashboard_view()
 
+        self.bg_canvas.bind("<Configure>", self._on_canvas_resize)
         self.root.bind("<Configure>", self._on_window_resize)
+
+    def _on_canvas_resize(self, event):
+        w, h = event.width, event.height
+        if w > 10 and h > 10:
+            self.bg_canvas.itemconfig(self.container_window, width=w, height=h)
 
     def _set_app_icon(self):
         icon_ico = get_resource_path("app_icon.ico")
@@ -226,17 +273,17 @@ class MiCOApp:
         for idx, card in enumerate(self.grid_scroll.winfo_children()):
             row = idx // cols
             col = idx % cols
-            card.grid(row=row, column=col, padx=8, pady=8, sticky="ew")
+            card.grid(row=row, column=col, padx=10, pady=10, sticky="ew")
 
     def _build_dashboard_ui(self):
         header = ctk.CTkFrame(self.dashboard_frame, fg_color="transparent")
         header.pack(fill="x", pady=(20, 5), padx=40)
-        ctk.CTkLabel(header, text="All-in-one document conversion tools", font=ctk.CTkFont(size=26, weight="bold"), text_color="#0F172A").pack()
-        ctk.CTkLabel(header, text="Convert, compress, and manage your files — fast, free, and beautifully simple.", text_color="#64748B", font=ctk.CTkFont(size=13)).pack(pady=2)
+        ctk.CTkLabel(header, text="All-in-one document conversion tools", font=ctk.CTkFont(size=26, weight="bold"), text_color="#000000").pack()
+        ctk.CTkLabel(header, text="Convert, compress, and manage your files — fast, free, and beautifully simple.", text_color="#334155", font=ctk.CTkFont(size=13)).pack(pady=2)
 
         search_frame = ctk.CTkFrame(self.dashboard_frame, fg_color="transparent")
         search_frame.pack(fill="x", padx=120, pady=10)
-        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search conversion tools...", height=40, corner_radius=20, fg_color="#f5f5f2", font=ctk.CTkFont(size=13))
+        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search conversion tools...", height=40, corner_radius=10, fg_color="#FFFFFF", border_color="#000000", border_width=2, text_color="#000000", font=ctk.CTkFont(size=13))
         self.search_entry.pack(fill="x")
         self.search_entry.bind("<KeyRelease>", self._filter_tools)
 
@@ -248,11 +295,12 @@ class MiCOApp:
         for cat in categories:
             btn = ctk.CTkButton(
                 tabs_frame, text=cat,
-                fg_color="#2563EB" if cat == self.active_category else "transparent",
-                text_color="white" if cat == self.active_category else "#64748B",
-                hover_color="#1D4ED8" if cat == self.active_category else "#E2E8F0",
-                height=32, corner_radius=16,
-                font=ctk.CTkFont(size=13, weight="bold" if cat == self.active_category else "normal"),
+                fg_color="#000000" if cat == self.active_category else "#FFFFFF",
+                text_color="white" if cat == self.active_category else "#000000",
+                border_color="#000000", border_width=2,
+                hover_color="#334155" if cat == self.active_category else "#E2E8F0",
+                height=32, corner_radius=8,
+                font=ctk.CTkFont(size=13, weight="bold"),
                 command=lambda c=cat: self._select_category(c)
             )
             btn.pack(side="left", padx=4)
@@ -270,9 +318,9 @@ class MiCOApp:
         self.active_category = cat
         for c, btn in self.tab_buttons.items():
             if c == cat:
-                btn.configure(fg_color="#2563EB", text_color="white", hover_color="#1D4ED8", font=ctk.CTkFont(size=13, weight="bold"))
+                btn.configure(fg_color="#000000", text_color="white", hover_color="#334155")
             else:
-                btn.configure(fg_color="transparent", text_color="#64748B", hover_color="#E2E8F0", font=ctk.CTkFont(size=13, weight="normal"))
+                btn.configure(fg_color="#FFFFFF", text_color="#000000", hover_color="#E2E8F0")
         self._filter_tools()
 
     def _filter_tools(self, event=None):
@@ -300,90 +348,111 @@ class MiCOApp:
 
             is_disabled = tool.get("disabled", False)
             card_cursor = "no" if is_disabled else "hand2"
+            
+            card_bg = PALETTE["DISABLE"] if is_disabled else TOOL_COLOR_MAP.get(tool["id"], PALETTE["PURPLE"])
 
             card = tk.Frame(
                 self.grid_scroll,
-                bg="#f5f5f2",
-                highlightthickness=1,
-                highlightbackground="#E2E8F0",
-                height=165,
+                bg=card_bg,
+                highlightthickness=3,
+                highlightbackground="#000000",
+                height=185,
                 cursor=card_cursor
             )
-            card.grid(row=row, column=col, padx=8, pady=8, sticky="ew")
+            card.grid(row=row, column=col, padx=10, pady=10, sticky="ew")
             card.pack_propagate(False)
 
-            top_f = tk.Frame(card, bg="#f5f5f2")
-            top_f.pack(fill="x", padx=14, pady=(12, 4))
+            top_f = tk.Frame(card, bg=card_bg)
+            top_f.pack(fill="x", padx=12, pady=(12, 6))
             
-            lbl_title = tk.Label(
-                top_f, 
-                text=tool["title"], 
-                font=("Segoe UI", 11, "bold"), 
-                bg="#f5f5f2",
-                fg="#64748B" if is_disabled else "#0F172A",
-                anchor="w"
+            badge_box = tk.Frame(
+                top_f,
+                bg="#FFFFFF",
+                highlightthickness=2,
+                highlightbackground="#000000"
             )
-            lbl_title.pack(side="left", fill="x", expand=True)
+            badge_box.pack(side="left")
 
-            is_pdf = (tool["badge"] == "PDF")
-            if is_disabled:
-                badge_bg = "#E2E8F0"
-                badge_fg = "#64748B"
-                hover_border_color = "#E2E8F0"
-            elif is_pdf:
-                badge_bg = "#FEE2E2"
-                badge_fg = "#B91C1C"
-                hover_border_color = "#EF4444"
-            else:
-                badge_bg = "#E0F2FE"
-                badge_fg = "#0369A1"
-                hover_border_color = "#2563EB"
+            icon_symbol = BADGE_ICON_MAP.get(tool["badge"], "📄")
+            badge_text = f"{icon_symbol} {tool['badge']}"
 
             badge = tk.Label(
-                top_f, 
-                text=tool["badge"], 
-                bg=badge_bg, 
-                fg=badge_fg, 
-                font=("Segoe UI", 8, "bold"), 
+                badge_box, 
+                text=badge_text, 
+                bg="#FFFFFF", 
+                fg="#000000", 
+                font=("Segoe UI", 9, "bold"), 
                 padx=6, 
                 pady=2
             )
-            badge.pack(side="right")
+            badge.pack()
+
+            lbl_title = tk.Label(
+                top_f, 
+                text=tool["title"], 
+                font=("Segoe UI", 10, "bold"), 
+                bg=card_bg,
+                fg="#FFFFFF",
+                anchor="w",
+                justify="left"
+            )
+            lbl_title.pack(side="left", fill="x", expand=True, padx=(8, 0))
 
             desc_label = tk.Label(
                 card, 
                 text=tool["desc"], 
                 font=("Segoe UI", 9), 
-                bg="#f5f5f2",
-                fg="#94A3B8" if is_disabled else "#64748B", 
+                bg=card_bg,
+                fg="#FFFFFF", 
                 justify="left",
-                anchor="nw",
-                wraplength=200
+                anchor="nw"
             )
-            desc_label.pack(fill="both", expand=True, padx=14, pady=(2, 8))
+            desc_label.pack(fill="both", expand=True, padx=12, pady=(2, 10))
 
-            def on_enter(e, c=card, h_color=hover_border_color, disabled=is_disabled):
+            def _update_wrap(event, label=desc_label):
+                label.configure(wraplength=max(100, event.width - 24))
+
+            card.bind("<Configure>", _update_wrap)
+
+            def on_enter(e, c=card, disabled=is_disabled):
                 if not disabled:
-                    c.configure(highlightbackground=h_color, highlightthickness=2)
+                    c.configure(highlightthickness=4)
 
             def on_leave(e, c=card):
-                c.configure(highlightbackground="#E2E8F0", highlightthickness=1)
+                c.configure(highlightthickness=3)
 
             if is_disabled:
-                click_action = lambda e: messagebox.showinfo("Feature Coming Soon", "Fitur ini sedang dalam tahap pengembangan dan akan segera hadir pada pembaruan berikutnya!")
+                click_action = lambda e: messagebox.showinfo("Feature Coming Soon", "Fitur ini sedang dalam tahap pengembangan dan akan segera hadir!")
             else:
                 click_action = lambda e, t=tool: self.open_tool_page(t)
 
-            for widget in (card, top_f, lbl_title, badge, desc_label):
+            for widget in (card, top_f, badge_box, badge, lbl_title, desc_label):
                 widget.bind("<Enter>", on_enter)
                 widget.bind("<Leave>", on_leave)
                 widget.bind("<Button-1>", click_action)
 
+    def _create_retro_shadow_label(self, parent, text, font, text_color="#FFFFFF", shadow_color="#000000", offset=(2, 2), pady=0):
+        container = ctk.CTkFrame(parent, fg_color="transparent")
+        container.pack(pady=pady)
+        
+        shadow_lbl = ctk.CTkLabel(container, text=text, font=font, text_color=shadow_color)
+        shadow_lbl.grid(row=0, column=0, padx=(offset[0], 0), pady=(offset[1], 0))
+        
+        front_lbl = ctk.CTkLabel(container, text=text, font=font, text_color=text_color)
+        front_lbl.grid(row=0, column=0, padx=(0, offset[0]), pady=(0, offset[1]))
+        
+        return container, front_lbl, shadow_lbl
+
+    def _update_supported_ext_text(self, text):
+        if hasattr(self, 'supported_ext_front') and hasattr(self, 'supported_ext_shadow'):
+            self.supported_ext_front.configure(text=text)
+            self.supported_ext_shadow.configure(text=text)
+
     def _build_tool_ui(self):
         top = ctk.CTkFrame(self.tool_frame, fg_color="transparent")
         top.pack(fill="x", padx=40, pady=15)
-        ctk.CTkButton(top, text="‹ Back", fg_color="transparent", text_color="#64748B", hover_color="#E2E8F0", width=60, font=ctk.CTkFont(size=13, weight="bold"), command=self.show_dashboard_view).pack(side="left")
-        self.nav_title_label = ctk.CTkLabel(top, text="  |   Tool", font=ctk.CTkFont(size=15, weight="bold"), text_color="#0F172A")
+        ctk.CTkButton(top, text="‹ Back", fg_color="#FFFFFF", text_color="#000000", border_color="#000000", border_width=2, hover_color="#E2E8F0", width=60, font=ctk.CTkFont(size=13, weight="bold"), command=self.show_dashboard_view).pack(side="left")
+        self.nav_title_label = ctk.CTkLabel(top, text="  |   Tool", font=ctk.CTkFont(size=15, weight="bold"), text_color="#000000")
         self.nav_title_label.pack(side="left")
 
         self.tool_scroll = ctk.CTkScrollableFrame(self.tool_frame, fg_color="transparent")
@@ -392,22 +461,52 @@ class MiCOApp:
         self.center_wrapper = ctk.CTkFrame(self.tool_scroll, fg_color="transparent")
         self.center_wrapper.pack(fill="x", padx=80, pady=5)
 
-        self.tool_main_title = ctk.CTkLabel(self.center_wrapper, text="Tool Title", font=ctk.CTkFont(size=26, weight="bold"), text_color="#0F172A")
+        self.tool_main_title = ctk.CTkLabel(self.center_wrapper, text="Tool Title", font=ctk.CTkFont(size=26, weight="bold"), text_color="#000000")
         self.tool_main_title.pack(pady=(5, 2))
         
-        self.tool_main_desc = ctk.CTkLabel(self.center_wrapper, text="Tool Description", text_color="#64748B", font=ctk.CTkFont(size=13))
+        self.tool_main_desc = ctk.CTkLabel(self.center_wrapper, text="Tool Description", text_color="#334155", font=ctk.CTkFont(size=13))
         self.tool_main_desc.pack(pady=(0, 10))
 
-        self.drop_box = ctk.CTkFrame(self.center_wrapper, fg_color="#F0F7FF", border_color="#93C5FD", border_width=2, corner_radius=12, height=170)
+        self.drop_box = ctk.CTkFrame(self.center_wrapper, fg_color="#74B4D9", border_color="#000000", border_width=2, corner_radius=12, height=170)
         self.drop_box.pack(fill="x", pady=5)
         self.drop_box.pack_propagate(False)
 
-        ctk.CTkLabel(self.drop_box, text="☁️", font=ctk.CTkFont(size=28)).pack(pady=(12, 2))
-        ctk.CTkLabel(self.drop_box, text="Drop files here or Browse", font=ctk.CTkFont(size=16, weight="bold"), text_color="#1E3A8A").pack()
-        self.supported_ext_label = ctk.CTkLabel(self.drop_box, text="Select files to convert", font=ctk.CTkFont(size=13), text_color="#64748B")
-        self.supported_ext_label.pack(pady=2)
+        ctk.CTkLabel(self.drop_box, text="☁️", font=ctk.CTkFont(size=28)).pack(pady=(10, 0))
 
-        ctk.CTkButton(self.drop_box, text="Browse Files", fg_color="white", text_color="#2563EB", border_color="#2563EB", border_width=1, hover_color="#EFF6FF", width=140, height=34, font=ctk.CTkFont(size=13, weight="bold"), command=self._browse_files).pack(pady=6)
+        self._create_retro_shadow_label(
+            self.drop_box,
+            text="Drop files here or Browse",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color="#FFFFFF",
+            shadow_color="#000000",
+            offset=(2, 2),
+            pady=(2, 0)
+        )
+
+        _, self.supported_ext_front, self.supported_ext_shadow = self._create_retro_shadow_label(
+            self.drop_box,
+            text="Select files to convert",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#FFFFFF",
+            shadow_color="#000000",
+            offset=(2, 2),
+            pady=(2, 4)
+        )
+
+        ctk.CTkButton(
+            self.drop_box,
+            text="Browse Files",
+            fg_color="#FFBE0B",
+            text_color="#000000",
+            border_color="#000000",
+            border_width=2,
+            hover_color="#E0A700",
+            width=140,
+            height=34,
+            corner_radius=6,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            command=self._browse_files
+        ).pack(pady=4)
 
         try:
             self.drop_box._canvas.drop_target_register(DND_FILES)
@@ -415,26 +514,44 @@ class MiCOApp:
         except Exception:
             pass
 
-        # Wadah daftar file bergaris tepi (bordered container)
         self.file_list_frame = ctk.CTkScrollableFrame(
             self.center_wrapper,
-            fg_color="#FFFFFF",
-            border_color="#CBD5E1",
-            border_width=1,
-            corner_radius=12,
+            fg_color="#F3D58D",
+            border_color="#000000",
+            border_width=2,
+            corner_radius=10,
             height=320
+        )
+
+        # Komponen Progress Bar & Label
+        self.progress_label = ctk.CTkLabel(
+            self.center_wrapper,
+            text="⏳ Processing file, please wait...",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#000000"
+        )
+
+        self.progress_bar = ctk.CTkProgressBar(
+            self.center_wrapper,
+            orientation="horizontal",
+            mode="indeterminate",
+            width=360,
+            height=14,
+            corner_radius=6,
+            progress_color="#00995E",
+            fg_color="#CBD5E1"
         )
 
         self.btn_convert = ctk.CTkButton(
             self.center_wrapper,
             text="Select Files Above to Convert",
             fg_color="#CBD5E1",
-            hover_color="#1D4ED8",
+            hover_color="#000000",
             text_color="white",
             text_color_disabled="#64748B",
             height=46,
             width=360,
-            corner_radius=10,
+            corner_radius=8,
             font=ctk.CTkFont(size=15, weight="bold"),
             command=self._execute_conversion
         )
@@ -451,9 +568,9 @@ class MiCOApp:
         tool_id = tool.get("id", "")
         if tool_id in TOOL_FILTER_MAP:
             ext_str = ", ".join([e.upper().replace(".", "") for e in TOOL_FILTER_MAP[tool_id][1]])
-            self.supported_ext_label.configure(text=f"Supports {ext_str} files")
+            self._update_supported_ext_text(f"Supports {ext_str} files")
         else:
-            self.supported_ext_label.configure(text="Select valid files")
+            self._update_supported_ext_text("Select valid files")
 
         self.update_file_list_ui()
         self.hide_all_frames()
@@ -501,7 +618,7 @@ class MiCOApp:
 
         if not self.selected_files:
             self.file_list_frame.pack_forget()
-            self.btn_convert.configure(state="disabled", text="Select Files Above to Convert", fg_color="#CBD5E1")
+            self.btn_convert.configure(state="disabled", text="Select Files Above to Convert", fg_color="#CBD5E1", text_color="#FFFFFF", border_width=0)
             return
 
         self.file_list_frame.pack(fill="x", pady=10)
@@ -509,22 +626,30 @@ class MiCOApp:
         self.btn_convert.pack_forget()
         self.btn_convert.pack(pady=(20, 40))
 
-        self.btn_convert.configure(state="normal", text=f"Convert Now ({len(self.selected_files)} File)", fg_color="#2563EB")
+        self.btn_convert.configure(
+            state="normal",
+            text=f"Convert Now ({len(self.selected_files)} File)",
+            fg_color="#D0E6FD",
+            text_color="#000000",
+            border_color="#000000",
+            border_width=2,
+            hover_color="#B3D7FC"
+        )
 
         top_info = ctk.CTkFrame(self.file_list_frame, fg_color="transparent")
         top_info.pack(fill="x", pady=(4, 8), padx=4)
-        ctk.CTkLabel(top_info, text=f"{len(self.selected_files)} file(s) selected", font=ctk.CTkFont(size=13, weight="bold"), text_color="#0F172A").pack(side="left")
-        ctk.CTkButton(top_info, text="Clear all", fg_color="transparent", text_color="#EF4444", hover_color="#FEE2E2", width=60, font=ctk.CTkFont(size=12), command=self._clear_all_files).pack(side="right")
+        ctk.CTkLabel(top_info, text=f"{len(self.selected_files)} file(s) selected", font=ctk.CTkFont(size=13, weight="bold"), text_color="#000000").pack(side="left")
+        ctk.CTkButton(top_info, text="Clear all", fg_color="transparent", text_color="#DC2626", hover_color="#FEE2E2", width=60, font=ctk.CTkFont(size=12, weight="bold"), command=self._clear_all_files).pack(side="right")
 
         for f in self.selected_files:
-            f_card = ctk.CTkFrame(self.file_list_frame, fg_color="#F8FAFC", corner_radius=8, border_width=1, border_color="#E2E8F0", height=42)
+            f_card = ctk.CTkFrame(self.file_list_frame, fg_color="#FFFFFF", corner_radius=6, border_width=1, border_color="#000000", height=42)
             f_card.pack(fill="x", pady=3, padx=4)
             f_card.pack_propagate(False)
 
             size_mb = round(os.path.getsize(f) / (1024 * 1024), 2) if os.path.exists(f) else 0
-            ctk.CTkLabel(f_card, text=f"📄  {os.path.basename(f)}", font=ctk.CTkFont(size=13, weight="bold"), text_color="#0F172A").pack(side="left", padx=12)
-            ctk.CTkLabel(f_card, text=f"{size_mb} MB", font=ctk.CTkFont(size=12), text_color="#64748B").pack(side="left", padx=10)
-            ctk.CTkButton(f_card, text="✕", fg_color="transparent", text_color="#94A3B8", hover_color="#E2E8F0", width=30, command=lambda path=f: self._remove_single_file(path)).pack(side="right", padx=8)
+            ctk.CTkLabel(f_card, text=f"📄  {os.path.basename(f)}", font=ctk.CTkFont(size=13, weight="bold"), text_color="#000000").pack(side="left", padx=12)
+            ctk.CTkLabel(f_card, text=f"{size_mb} MB", font=ctk.CTkFont(size=12), text_color="#475569").pack(side="left", padx=10)
+            ctk.CTkButton(f_card, text="✕", fg_color="transparent", text_color="#000000", hover_color="#E2E8F0", width=30, command=lambda path=f: self._remove_single_file(path)).pack(side="right", padx=8)
 
     def _remove_single_file(self, path):
         if path in self.selected_files:
@@ -535,6 +660,41 @@ class MiCOApp:
         self.selected_files = []
         self.update_file_list_ui()
 
+    def _get_password_input(self, title, prompt):
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title(title)
+        dialog.geometry("400x200")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 200
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 100
+        dialog.geometry(f"+{max(0, x)}+{max(0, y)}")
+
+        result = {"value": None}
+
+        ctk.CTkLabel(dialog, text=prompt, font=ctk.CTkFont(size=13, weight="bold"), wraplength=360).pack(pady=(20, 10), padx=20)
+        entry = ctk.CTkEntry(dialog, show="*", width=300, height=36, corner_radius=8)
+        entry.pack(pady=5)
+        entry.focus()
+
+        def on_ok():
+            result["value"] = entry.get()
+            dialog.destroy()
+
+        def on_cancel():
+            dialog.destroy()
+
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(pady=15)
+        ctk.CTkButton(btn_frame, text="OK", width=90, height=32, command=on_ok, fg_color="#000000", hover_color="#334155").pack(side="left", padx=6)
+        ctk.CTkButton(btn_frame, text="Batal", width=90, height=32, command=on_cancel, fg_color="#64748B", hover_color="#475569").pack(side="left", padx=6)
+
+        entry.bind("<Return>", lambda e: on_ok())
+        dialog.wait_window()
+        return result["value"]
+
     def _execute_conversion(self):
         if not self.selected_files:
             messagebox.showwarning("Warning", "Silakan pilih file terlebih dahulu!")
@@ -543,15 +703,13 @@ class MiCOApp:
         tool_id = self.current_tool.get("id", "") if self.current_tool else ""
 
         if tool_id == "PROTECT_PDF":
-            dialog = ctk.CTkInputDialog(text="Masukkan kata sandi untuk melindungi PDF:", title="Protect PDF Password")
-            password = dialog.get_input()
+            password = self._get_password_input("Protect PDF Password", "Masukkan kata sandi untuk melindungi PDF:")
             if not password:
                 return
             self._process_protect_pdf(password)
             return
         elif tool_id == "UNLOCK_PDF":
-            dialog = ctk.CTkInputDialog(text="Masukkan kata sandi PDF untuk membuka kunci:", title="Unlock PDF Password")
-            password = dialog.get_input()
+            password = self._get_password_input("Unlock PDF Password", "Masukkan kata sandi PDF untuk membuka kunci:")
             if not password:
                 return
             self._process_unlock_pdf(password)
@@ -573,25 +731,19 @@ class MiCOApp:
 
     def _process_compress_pdf(self):
         self.set_converting_state(True)
-        self.root.update()
-
         files_to_process = list(self.selected_files)
-
-        import threading
         threading.Thread(target=self._worker_compress_pdf, args=(files_to_process,), daemon=True).start()
 
     def _worker_compress_pdf(self, files_to_process):
         start_time = time.time()
+        
         try:
-            import pymupdf as fitz
+            import pymupdf
         except ImportError:
-            try:
-                import fitz
-            except ImportError:
-                self.root.after(0, lambda: self._handle_compress_error(
-                    "Modul 'pymupdf' belum terinstal.\n\nJalankan perintah ini di terminal:\npip install pymupdf"
-                ))
-                return
+            self.root.after(0, lambda: self._handle_conversion_error(
+                "Modul 'pymupdf' belum terinstal.\n\nJalankan perintah ini di terminal:\npip install pymupdf"
+            ))
+            return
 
         out_path = None
         try:
@@ -607,7 +759,7 @@ class MiCOApp:
                 name, ext = os.path.splitext(base_name)
                 out_path = os.path.join(self.output_dir, f"{name}_compressed.pdf")
 
-                doc = fitz.open(file_path)
+                doc = pymupdf.open(file_path)
                 try:
                     for page in doc:
                         for img in page.get_images():
@@ -616,9 +768,9 @@ class MiCOApp:
                                 old_stream = doc.xref_stream(xref)
                                 old_len = len(old_stream) if old_stream else 0
 
-                                pix = fitz.Pixmap(doc, xref)
+                                pix = pymupdf.Pixmap(doc, xref)
                                 if pix.n > 4:
-                                    pix = fitz.Pixmap(fitz.csRGB, pix)
+                                    pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
                                 
                                 img_bytes = pix.tobytes("jpeg", jpg_quality=60)
                                 
@@ -665,7 +817,7 @@ class MiCOApp:
                 "out_dir": self.output_dir
             }
 
-            self.root.after(0, lambda: self._handle_compress_success(summary))
+            self.root.after(0, lambda: self._handle_conversion_success(summary))
 
         except Exception as e:
             if out_path and os.path.exists(out_path):
@@ -675,20 +827,14 @@ class MiCOApp:
                     pass
 
             err_msg = str(e)
-            self.root.after(0, lambda msg=err_msg: self._handle_compress_error(f"Gagal mengompres PDF: {msg}"))
-
-    def _handle_compress_success(self, summary):
-        self.set_converting_state(False)
-        self.show_success_view(summary)
-
-    def _handle_compress_error(self, err_msg):
-        self.set_converting_state(False)
-        messagebox.showerror("Error", err_msg)
+            self.root.after(0, lambda msg=err_msg: self._handle_conversion_error(f"Gagal mengompres PDF: {msg}"))
 
     def _process_protect_pdf(self, password):
         self.set_converting_state(True)
-        self.root.update()
+        files_to_process = list(self.selected_files)
+        threading.Thread(target=self._worker_protect_pdf, args=(files_to_process, password), daemon=True).start()
 
+    def _worker_protect_pdf(self, files_to_process, password):
         start_time = time.time()
         try:
             try:
@@ -696,13 +842,12 @@ class MiCOApp:
             except ImportError:
                 from PyPDF2 import PdfReader, PdfWriter
         except ImportError:
-            self.set_converting_state(False)
-            messagebox.showerror("Error Library", "Modul 'pypdf' belum terinstal.\n\nJalankan perintah ini di terminal:\npip install pypdf")
+            self.root.after(0, lambda: self._handle_conversion_error("Modul 'pypdf' belum terinstal.\n\nJalankan perintah ini di terminal:\npip install pypdf"))
             return
 
         try:
             out_files = []
-            for file_path in self.selected_files:
+            for file_path in files_to_process:
                 reader = PdfReader(file_path)
                 writer = PdfWriter()
 
@@ -731,16 +876,17 @@ class MiCOApp:
                 "status": "Success",
                 "out_dir": self.output_dir
             }
-            self.set_converting_state(False)
-            self.show_success_view(summary)
+            self.root.after(0, lambda: self._handle_conversion_success(summary))
         except Exception as e:
-            self.set_converting_state(False)
-            messagebox.showerror("Error", f"Gagal memproteksi PDF: {e}")
+            err_msg = str(e)
+            self.root.after(0, lambda msg=err_msg: self._handle_conversion_error(f"Gagal memproteksi PDF: {msg}"))
 
     def _process_unlock_pdf(self, password):
         self.set_converting_state(True)
-        self.root.update()
+        files_to_process = list(self.selected_files)
+        threading.Thread(target=self._worker_unlock_pdf, args=(files_to_process, password), daemon=True).start()
 
+    def _worker_unlock_pdf(self, files_to_process, password):
         start_time = time.time()
         try:
             try:
@@ -748,13 +894,12 @@ class MiCOApp:
             except ImportError:
                 from PyPDF2 import PdfReader, PdfWriter
         except ImportError:
-            self.set_converting_state(False)
-            messagebox.showerror("Error Library", "Modul 'pypdf' belum terinstal.\n\nJalankan perintah ini di terminal:\npip install pypdf")
+            self.root.after(0, lambda: self._handle_conversion_error("Modul 'pypdf' belum terinstal.\n\nJalankan perintah ini di terminal:\npip install pypdf"))
             return
 
         try:
             out_files = []
-            for file_path in self.selected_files:
+            for file_path in files_to_process:
                 reader = PdfReader(file_path)
                 
                 if reader.is_encrypted:
@@ -786,18 +931,38 @@ class MiCOApp:
                 "status": "Success",
                 "out_dir": self.output_dir
             }
-            self.set_converting_state(False)
-            self.show_success_view(summary)
+            self.root.after(0, lambda: self._handle_conversion_success(summary))
         except Exception as e:
-            self.set_converting_state(False)
-            messagebox.showerror("Error", f"Gagal membuka kunci PDF: {e}")
+            err_msg = str(e)
+            self.root.after(0, lambda msg=err_msg: self._handle_conversion_error(f"Gagal membuka kunci PDF: {msg}"))
+
+    def _handle_conversion_success(self, summary):
+        self.set_converting_state(False)
+        self.show_success_view(summary)
+
+    def _handle_conversion_error(self, err_msg):
+        self.set_converting_state(False)
+        messagebox.showerror("Error", err_msg)
 
     def set_converting_state(self, is_processing):
         self.is_converting = is_processing
         if is_processing:
-            self.btn_convert.configure(state="disabled", text="Converting...", fg_color="#93C5FD")
+            self.btn_convert.configure(state="disabled", text="Converting...", fg_color="#64748B", text_color="#FFFFFF", border_width=0)
+            self.progress_label.pack(before=self.btn_convert, pady=(15, 4))
+            self.progress_bar.pack(before=self.btn_convert, pady=(0, 15))
+            self.progress_bar.start()
         else:
-            self.btn_convert.configure(state="normal", text=f"Convert Now ({len(self.selected_files)} File)", fg_color="#2563EB")
+            self.progress_bar.stop()
+            self.progress_bar.pack_forget()
+            self.progress_label.pack_forget()
+            self.btn_convert.configure(
+                state="normal",
+                text=f"Convert Now ({len(self.selected_files)} File)",
+                fg_color="#D0E6FD",
+                text_color="#000000",
+                border_color="#000000",
+                border_width=2
+            )
 
     def show_success_view(self, summary):
         self.hide_all_frames()
@@ -807,17 +972,40 @@ class MiCOApp:
 
         self.success_frame.pack(fill="both", expand=True)
 
-        ctk.CTkLabel(self.success_frame, text="✓", font=ctk.CTkFont(size=32, weight="bold"), text_color="#10B981", fg_color="#D1FAE5", width=64, height=64, corner_radius=32).pack(pady=(25, 10))
-        ctk.CTkLabel(self.success_frame, text="Conversion Complete!", font=ctk.CTkFont(size=24, weight="bold"), text_color="#0F172A").pack()
-        ctk.CTkLabel(self.success_frame, text="Your file is ready to download.", text_color="#64748B", font=ctk.CTkFont(size=13)).pack(pady=(2, 12))
+        check_box = tk.Frame(
+            self.success_frame,
+            bg="#00995E",
+            highlightthickness=2,
+            highlightbackground="#000000",
+            width=64,
+            height=64
+        )
+        check_box.pack(pady=(25, 10))
+        check_box.pack_propagate(False)
 
-        center_container = ctk.CTkFrame(self.success_frame, fg_color="transparent", width=540)
+        ctk.CTkLabel(
+            check_box,
+            text="✓",
+            font=ctk.CTkFont(size=32, weight="bold"),
+            text_color="#FFFFFF"
+        ).pack(expand=True)
+
+        ctk.CTkLabel(self.success_frame, text="Conversion Complete!", font=ctk.CTkFont(size=24, weight="bold"), text_color="#000000").pack()
+        ctk.CTkLabel(self.success_frame, text="Your file is ready to download.", text_color="#334155", font=ctk.CTkFont(size=13)).pack(pady=(2, 12))
+
+        center_container = ctk.CTkFrame(self.success_frame, fg_color="transparent")
         center_container.pack(pady=5)
 
-        card = ctk.CTkFrame(center_container, fg_color="#f5f5f2", corner_radius=12, border_width=1, border_color="#E2E8F0", width=540)
-        card.pack(fill="x", pady=(0, 10))
+        card = tk.Frame(
+            center_container,
+            bg="#FFFFFF",
+            highlightthickness=2,
+            highlightbackground="#000000",
+            width=500
+        )
+        card.pack(fill="x", pady=(0, 10), padx=10)
 
-        ctk.CTkLabel(card, text="CONVERSION SUMMARY", font=ctk.CTkFont(size=12, weight="bold"), text_color="#94A3B8").pack(anchor="w", padx=24, pady=(16, 10))
+        ctk.CTkLabel(card, text="CONVERSION SUMMARY", font=ctk.CTkFont(size=12, weight="bold"), text_color="#64748B", bg_color="transparent").pack(anchor="w", padx=20, pady=(16, 10))
 
         items = [
             ("Tool Used", summary.get("tool_name", "N/A")),
@@ -828,19 +1016,24 @@ class MiCOApp:
         ]
 
         for label, val in items:
-            row = ctk.CTkFrame(card, fg_color="transparent")
-            row.pack(fill="x", padx=24, pady=4)
-            ctk.CTkLabel(row, text=label, text_color="#64748B", font=ctk.CTkFont(size=13)).pack(side="left")
-            val_color = "#10B981" if label == "Status" else "#0F172A"
-            ctk.CTkLabel(row, text=val, text_color=val_color, font=ctk.CTkFont(size=13, weight="bold")).pack(side="right")
+            row = tk.Frame(card, bg="#FFFFFF")
+            row.pack(fill="x", padx=20, pady=4)
+            ctk.CTkLabel(row, text=label, text_color="#334155", font=ctk.CTkFont(size=13), bg_color="transparent").pack(side="left")
+            val_color = "#00995E" if label == "Status" else "#000000"
+            ctk.CTkLabel(row, text=val, text_color=val_color, font=ctk.CTkFont(size=13, weight="bold"), bg_color="transparent").pack(side="right")
 
-        ctk.CTkFrame(card, fg_color="transparent", height=12).pack()
+        tk.Frame(card, bg="#FFFFFF", height=12).pack()
 
-        badge = ctk.CTkFrame(center_container, fg_color="#ECFDF5", border_color="#A7F3D0", border_width=1, corner_radius=8, width=540)
-        badge.pack(fill="x", pady=(0, 15))
+        badge = tk.Frame(
+            center_container,
+            bg="#ECFDF5",
+            highlightthickness=2,
+            highlightbackground="#000000"
+        )
+        badge.pack(fill="x", pady=(0, 15), padx=10)
         
         saved_info = summary.get("saved_amount", summary.get("size_savings", "Protected"))
-        ctk.CTkLabel(badge, text=f"★ Saved {saved_info} — process complete!", text_color="#047857", font=ctk.CTkFont(size=13, weight="bold")).pack(pady=8)
+        ctk.CTkLabel(badge, text=f"★ Saved {saved_info} — process complete!", text_color="#00995E", font=ctk.CTkFont(size=13, weight="bold"), bg_color="transparent").pack(pady=8, padx=12)
 
         btn_box = ctk.CTkFrame(self.success_frame, fg_color="transparent")
         btn_box.pack(pady=5)
@@ -849,11 +1042,12 @@ class MiCOApp:
         ctk.CTkButton(
             btn_box, 
             text="Download File", 
-            fg_color="#2563EB", 
-            hover_color="#1D4ED8", 
+            fg_color="#000000", 
+            hover_color="#334155", 
             text_color="#FFFFFF", 
             height=42, 
             width=170, 
+            corner_radius=8,
             font=ctk.CTkFont(size=13, weight="bold"), 
             command=lambda: self.download_and_save_file(out_folder)
         ).pack(side="left", padx=8)
@@ -861,13 +1055,14 @@ class MiCOApp:
         ctk.CTkButton(
             btn_box, 
             text="Convert Another", 
-            fg_color="#f5f5f2", 
-            text_color="#0F172A", 
-            border_color="#CBD5E1", 
-            border_width=1, 
+            fg_color="#FFFFFF", 
+            text_color="#000000", 
+            border_color="#000000", 
+            border_width=2, 
             hover_color="#E2E8F0", 
             height=42, 
             width=170, 
+            corner_radius=8,
             font=ctk.CTkFont(size=13, weight="bold"), 
             command=self.show_dashboard_view
         ).pack(side="left", padx=8)
@@ -876,7 +1071,7 @@ class MiCOApp:
             self.success_frame, 
             text="← Back to all tools", 
             fg_color="transparent", 
-            text_color="#64748B", 
+            text_color="#334155", 
             hover_color="#E2E8F0", 
             font=ctk.CTkFont(size=13), 
             command=self.show_dashboard_view
@@ -906,7 +1101,6 @@ class MiCOApp:
                     if os.path.abspath(src_path) == os.path.abspath(dest_path):
                         continue
 
-                    # Menggunakan shutil.move agar file dipindahkan dan tidak menyisakan duplikat
                     shutil.move(src_path, dest_path)
 
                 messagebox.showinfo("Berhasil", f"File berhasil dipindahkan ke:\n{target_folder}")
