@@ -13,41 +13,81 @@ def get_resource_path(relative_path):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
 
+def is_pdf_locked(file_path):
+    """ Memeriksa apakah file PDF dilindungi password """
+    if not file_path.lower().endswith('.pdf'):
+        return False
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(file_path)
+        return reader.is_encrypted
+    except Exception:
+        try:
+            import fitz
+            doc = fitz.open(file_path)
+            is_enc = doc.is_encrypted
+            doc.close()
+            return is_enc
+        except Exception:
+            return False
+
 # Import fungsi dari modules secara TERPISAH & ISOLATED
 try:
     from modules.word_to_pdf import convert_word_to_pdf
-except Exception as e:
-    def convert_word_to_pdf(*a, **k): return 0, 1, f"Fitur Word to PDF tidak tersedia: {e}"
+except Exception as _e:
+    _err_w2p = str(_e)
+    def convert_word_to_pdf(*a, **k):
+        return 0, 1, f"Fitur Word to PDF membutuhkan Microsoft Office (Windows): {_err_w2p}"
 
 try:
-    from modules.excel_tools import convert_excel_to_pdf, convert_pdf_to_excel
-except Exception as e:
-    def convert_excel_to_pdf(*a, **k): return 0, 1, f"Error modul Excel: {e}"
-    def convert_pdf_to_excel(*a, **k): return 0, 1, f"Error modul PDF to Excel: {e}"
+    from modules.excel_tools import convert_excel_to_pdf
+except Exception as _e:
+    _err_e2p = str(_e)
+    def convert_excel_to_pdf(*a, **k):
+        return 0, 1, f"Fitur Excel to PDF membutuhkan Microsoft Office (Windows): {_err_e2p}"
 
 try:
-    from modules.ppt_tools import convert_ppt_to_pdf, convert_pdf_to_ppt
-except Exception as e:
-    def convert_ppt_to_pdf(*a, **k): return 0, 1, f"Fitur PPT to PDF tidak tersedia: {e}"
-    def convert_pdf_to_ppt(*a, **k): return 0, 1, f"Error modul PDF to PPT: {e}"
+    from modules.excel_tools import convert_pdf_to_excel
+except Exception as _e:
+    _err_p2e = str(_e)
+    def convert_pdf_to_excel(*a, **k):
+        return 0, 1, f"Error modul PDF to Excel: {_err_p2e}"
+
+try:
+    from modules.ppt_tools import convert_ppt_to_pdf
+except Exception as _e:
+    _err_p2pdf = str(_e)
+    def convert_ppt_to_pdf(*a, **k):
+        return 0, 1, f"Fitur PPT to PDF membutuhkan Microsoft Office (Windows): {_err_p2pdf}"
+
+try:
+    from modules.ppt_tools import convert_pdf_to_ppt
+except Exception as _e:
+    _err_p2ppt = str(_e)
+    def convert_pdf_to_ppt(*a, **k):
+        return 0, 1, f"Error modul PDF to PPT: {_err_p2ppt}"
 
 try:
     from modules.pdf_to_word import convert_pdf_to_word
-except Exception as e:
-    def convert_pdf_to_word(*a, **k): return 0, 1, f"Error modul PDF to Word: {e}"
+except Exception as _e:
+    _err_p2w = str(_e)
+    def convert_pdf_to_word(*a, **k):
+        return 0, 1, f"Error modul PDF to Word: {_err_p2w}"
 
 try:
     from modules.image_tools import convert_image_to_pdf, convert_pdf_to_image
-except Exception as e:
-    def convert_image_to_pdf(*a, **k): return 0, 1, f"Error modul Image: {e}"
-    def convert_pdf_to_image(*a, **k): return 0, 1, f"Error modul PDF to Image: {e}"
+except Exception as _e:
+    _err_img = str(_e)
+    def convert_image_to_pdf(*a, **k): return 0, 1, f"Error Image to PDF: {_err_img}"
+    def convert_pdf_to_image(*a, **k): return 0, 1, f"Error PDF to Image: {_err_img}"
 
 try:
     from modules.pdf_tools import merge_pdfs, split_pdf, compress_pdf
-except Exception as e:
-    def merge_pdfs(*a, **k): return 0, 1, f"Error modul Merge PDF: {e}"
-    def split_pdf(*a, **k): return 0, 1, f"Error modul Split PDF: {e}"
-    def compress_pdf(*a, **k): return 0, 1, f"Error modul Compress PDF: {e}"
+except Exception as _e:
+    _err_pdf_tools = str(_e)
+    def merge_pdfs(*a, **k): return 0, 1, f"Error Merge PDF: {_err_pdf_tools}"
+    def split_pdf(*a, **k): return 0, 1, f"Error Split PDF: {_err_pdf_tools}"
+    def compress_pdf(*a, **k): return 0, 1, f"Error Compress PDF: {_err_pdf_tools}"
 
 TOOLS_DATA = [
     {"id": "WORD_TO_PDF", "title": "Word to PDF", "desc": "Convert DOC/DOCX documents to PDF format.", "badge": "DOCX", "cat": "Convert to PDF", "ext": ("Word Files (*.docx;*.doc)", "All Files (*.*)"), "target_ext": ".pdf"},
@@ -139,6 +179,16 @@ class Api:
         if not target_dir or not os.path.exists(target_dir):
             return {"status": "error", "message": "Folder penyimpanan tidak valid."}
 
+        # Pengecekan PDF Terkunci otomatis untuk semua fitur selain UNLOCK_PDF
+        if tool_id != "UNLOCK_PDF":
+            for fp in file_paths:
+                if is_pdf_locked(fp):
+                    file_name = os.path.basename(fp)
+                    return {
+                        "status": "error", 
+                        "message": f"File '{file_name}' masih terkunci! Silakan buka kunci terlebih dahulu menggunakan fitur 'Unlock PDF'."
+                    }
+
         start_time = time.time()
         existing_files = set(os.listdir(target_dir)) if os.path.exists(target_dir) else set()
 
@@ -186,10 +236,10 @@ class Api:
                     created_path = os.path.join(target_dir, created_file)
                     
                     _, ext = os.path.splitext(created_file)
-                    if not custom_filename.lower().endswith(ext.lower()):
-                        custom_filename += ext
+                    clean_custom_name = os.path.splitext(custom_filename)[0]
+                    final_filename = clean_custom_name + ext
                     
-                    final_path = os.path.join(target_dir, custom_filename)
+                    final_path = os.path.join(target_dir, final_filename)
                     if created_path != final_path:
                         if os.path.exists(final_path):
                             os.remove(final_path)
@@ -225,9 +275,8 @@ class Api:
                 base_name = os.path.basename(file_path)
                 name, _ = os.path.splitext(base_name)
                 
-                out_name = custom_filename if (custom_filename and len(file_paths) == 1) else f"{name}_protected.pdf"
-                if not out_name.endswith(".pdf"):
-                    out_name += ".pdf"
+                clean_name = os.path.splitext(custom_filename)[0] if (custom_filename and len(file_paths) == 1) else f"{name}_protected"
+                out_name = f"{clean_name}.pdf"
                     
                 out_path = os.path.join(target_dir, out_name)
                 with open(out_path, "wb") as f:
@@ -254,9 +303,8 @@ class Api:
                 base_name = os.path.basename(file_path)
                 name, _ = os.path.splitext(base_name)
                 
-                out_name = custom_filename if (custom_filename and len(file_paths) == 1) else f"{name}_unlocked.pdf"
-                if not out_name.endswith(".pdf"):
-                    out_name += ".pdf"
+                clean_name = os.path.splitext(custom_filename)[0] if (custom_filename and len(file_paths) == 1) else f"{name}_unlocked"
+                out_name = f"{clean_name}.pdf"
                     
                 out_path = os.path.join(target_dir, out_name)
                 with open(out_path, "wb") as f:
