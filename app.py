@@ -7,16 +7,47 @@ import tempfile
 import subprocess
 import webview
 
-# Import fungsi dari modules
+def get_resource_path(relative_path):
+    """ Mendapatkan path absolut ke resource, kompatibel dengan PyInstaller bundle macOS & Windows """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+# Import fungsi dari modules secara TERPISAH & ISOLATED
 try:
     from modules.word_to_pdf import convert_word_to_pdf
+except Exception as e:
+    def convert_word_to_pdf(*a, **k): return 0, 1, f"Fitur Word to PDF tidak tersedia: {e}"
+
+try:
     from modules.excel_tools import convert_excel_to_pdf, convert_pdf_to_excel
+except Exception as e:
+    def convert_excel_to_pdf(*a, **k): return 0, 1, f"Error modul Excel: {e}"
+    def convert_pdf_to_excel(*a, **k): return 0, 1, f"Error modul PDF to Excel: {e}"
+
+try:
     from modules.ppt_tools import convert_ppt_to_pdf, convert_pdf_to_ppt
+except Exception as e:
+    def convert_ppt_to_pdf(*a, **k): return 0, 1, f"Fitur PPT to PDF tidak tersedia: {e}"
+    def convert_pdf_to_ppt(*a, **k): return 0, 1, f"Error modul PDF to PPT: {e}"
+
+try:
     from modules.pdf_to_word import convert_pdf_to_word
+except Exception as e:
+    def convert_pdf_to_word(*a, **k): return 0, 1, f"Error modul PDF to Word: {e}"
+
+try:
     from modules.image_tools import convert_image_to_pdf, convert_pdf_to_image
+except Exception as e:
+    def convert_image_to_pdf(*a, **k): return 0, 1, f"Error modul Image: {e}"
+    def convert_pdf_to_image(*a, **k): return 0, 1, f"Error modul PDF to Image: {e}"
+
+try:
     from modules.pdf_tools import merge_pdfs, split_pdf, compress_pdf
 except Exception as e:
-    print(f"Warning importing modules: {e}")
+    def merge_pdfs(*a, **k): return 0, 1, f"Error modul Merge PDF: {e}"
+    def split_pdf(*a, **k): return 0, 1, f"Error modul Split PDF: {e}"
+    def compress_pdf(*a, **k): return 0, 1, f"Error modul Compress PDF: {e}"
 
 TOOLS_DATA = [
     {"id": "WORD_TO_PDF", "title": "Word to PDF", "desc": "Convert DOC/DOCX documents to PDF format.", "badge": "DOCX", "cat": "Convert to PDF", "ext": ("Word Files (*.docx;*.doc)", "All Files (*.*)"), "target_ext": ".pdf"},
@@ -146,12 +177,10 @@ class Api:
             if success == 0 and err:
                 return {"status": "error", "message": err}
 
-            # Lacak file yang baru saja dibuat
             new_files = list(set(os.listdir(target_dir)) - existing_files)
             final_file_path = target_dir
 
             if new_files:
-                # Hanya rename jika custom_filename diisi DAN hanya ada 1 file output yang dihasilkan
                 if custom_filename and len(new_files) == 1:
                     created_file = new_files[0]
                     created_path = os.path.join(target_dir, created_file)
@@ -167,10 +196,8 @@ class Api:
                         os.rename(created_path, final_path)
                     final_file_path = final_path
                 else:
-                    # Untuk multiple files, sorot file pertama yang dihasilkan
                     final_file_path = os.path.join(target_dir, new_files[0])
 
-            # Otomatis Buka File Explorer & Sorot File
             self.open_and_select_file(final_file_path)
 
             elapsed = round(time.time() - start_time, 1)
@@ -241,20 +268,25 @@ class Api:
             return {"status": "error", "message": str(e)}
 
     def open_and_select_file(self, file_path):
-        """ Membuka File Explorer dan menyorot file secara langsung """
+        """ Membuka File Explorer / Finder lintas platform (Windows & macOS) """
         try:
             if file_path and os.path.exists(file_path):
-                if os.path.isfile(file_path):
-                    subprocess.Popen(['explorer', '/select,', os.path.normpath(file_path)])
-                else:
-                    os.startfile(file_path)
+                if sys.platform == "win32":
+                    if os.path.isfile(file_path):
+                        subprocess.Popen(['explorer', '/select,', os.path.normpath(file_path)])
+                    else:
+                        os.startfile(file_path)
+                elif sys.platform == "darwin": # macOS Finder
+                    if os.path.isfile(file_path):
+                        subprocess.Popen(['open', '-R', file_path])
+                    else:
+                        subprocess.Popen(['open', file_path])
         except Exception as e:
             print(f"Error opening file explorer: {e}")
 
 if __name__ == '__main__':
     api = Api()
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    html_path = os.path.join(current_dir, 'web', 'index.html')
+    html_path = get_resource_path(os.path.join('web', 'index.html'))
 
     window = webview.create_window(
         'MiCO File Converter',
