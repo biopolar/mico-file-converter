@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIERS Converter</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body { 
+            background-color: #f4efea; 
+            color: #000000; 
+            padding: 24px; 
+            background-image: radial-gradient(#c8c2b7 1.5px, transparent 1.5px);
+            background-size: 20px 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .main-container {
+            flex: 1;
+        }
+
+        .app-header {
+            text-align: center;
+            margin-bottom: 28px;
+            background: #ffe66d;
+            border: 3px solid #000;
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 5px 5px 0px #000;
+            max-width: 1100px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .app-header h1 {
+            font-size: 28px;
+            font-weight: 900;
+            color: #000;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+        
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
+            gap: 20px; 
+            max-width: 1100px; 
+            margin: 0 auto; 
+        }
+
+        .tool-card { 
+            padding: 20px; 
+            border-radius: 12px; 
+            border: 3px solid #000; 
+            box-shadow: 5px 5px 0px #000; 
+            cursor: pointer; 
+            transition: all 0.15s ease-in-out; 
+            position: relative;
+        }
+        .tool-card:hover { 
+            transform: translate(-3px, -3px); 
+            box-shadow: 8px 8px 0px #000; 
+        }
+        .tool-card:active {
+            transform: translate(2px, 2px);
+            box-shadow: 3px 3px 0px #000;
+        }
+
+        .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .badge { background: #000; color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: 900; letter-spacing: 0.5px; }
+        .card-title { font-weight: 800; font-size: 16px; color: #000; }
+        .card-desc { font-size: 13px; color: #1a1a1a; line-height: 1.4; font-weight: 600; }
+
+        .card-word { background: #82ccdd; }
+        .card-excel { background: #7bed9f; }
+        .card-ppt { background: #ffbe76; }
+        .card-pdf { background: #ff7675; }
+        .card-img { background: #e0affc; }
+        .card-tool { background: #ffd166; }
+
+        /* Modal Base */
+        .modal { 
+            display: none; 
+            position: fixed; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            background: rgba(0, 0, 0, 0.7); 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 1000; 
+        }
+        .modal-content { 
+            background: #fff; 
+            width: 90%; 
+            max-width: 550px; 
+            border-radius: 12px; 
+            padding: 24px; 
+            position: relative; 
+            max-height: 90vh; 
+            overflow-y: auto; 
+            border: 4px solid #000; 
+            box-shadow: 8px 8px 0px #000;
+        }
+        .close-btn { 
+            position: absolute; 
+            top: 16px; 
+            right: 18px; 
+            font-size: 18px; 
+            cursor: pointer; 
+            border: 2px solid #000; 
+            background: #ff4757; 
+            color: #fff; 
+            font-weight: bold; 
+            width: 32px; 
+            height: 32px; 
+            border-radius: 6px; 
+            box-shadow: 2px 2px 0px #000;
+        }
+
+        .drop-zone { 
+            border: 3px dashed #000; 
+            border-radius: 8px; 
+            padding: 26px; 
+            text-align: center; 
+            background: #fff8dc; 
+            margin: 15px 0; 
+            transition: background 0.2s; 
+            cursor: pointer; 
+            font-weight: 700;
+        }
+        .drop-zone.drag-over { background: #ffe66d; border-style: solid; }
+
+        .file-header { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; font-weight: 800; }
+        .file-list { margin-top: 8px; max-height: 150px; overflow-y: auto; border: 2px solid #000; border-radius: 6px; padding: 6px; background: #fafafa; }
+        .file-item { display: flex; justify-content: space-between; padding: 6px 10px; background: #fff; margin-bottom: 4px; border: 1px solid #000; border-radius: 4px; font-size: 13px; font-weight: 600; }
+        .delete-single-btn { color: #ff4757; border: none; background: none; cursor: pointer; font-weight: 800; font-size: 14px; }
+
+        .form-group { margin-top: 14px; }
+        .form-group label { display: block; font-size: 13px; margin-bottom: 6px; font-weight: 700; }
+        .form-control { width: 100%; padding: 10px 12px; border: 2px solid #000; border-radius: 6px; font-size: 13px; font-weight: 600; background: #fff; }
+        .btn-row { display: flex; gap: 8px; margin-top: 6px; }
+
+        .btn { padding: 12px 18px; border: 3px solid #000; border-radius: 8px; cursor: pointer; font-weight: 800; width: 100%; margin-top: 18px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .btn-primary { background: #ff7f50; color: #000; box-shadow: 4px 4px 0px #000; }
+        .btn-primary:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #000; }
+
+        .btn-secondary { background: #ffd166; color: #000; border: 2px solid #000; box-shadow: 3px 3px 0px #000; width: auto; padding: 8px 14px; font-size: 12px; margin-top: 0; font-weight: 800; }
+
+        .status-box { margin-top: 14px; padding: 12px; border-radius: 6px; font-size: 13px; font-weight: 700; border: 2px solid #000; display: none; }
+        .status-success { background: #abf7b1; color: #000; box-shadow: 3px 3px 0px #000; }
+        .status-error { background: #ff8b94; color: #000; box-shadow: 3px 3px 0px #000; }
+
+        /* Footer Neobrutalism Style */
+        .app-footer {
+            text-align: center;
+            margin-top: 36px;
+            background: #ffffff;
+            border: 3px solid #000;
+            padding: 12px 20px;
+            border-radius: 10px;
+            box-shadow: 4px 4px 0px #000;
+            max-width: 1100px;
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+            font-size: 13px;
+            font-weight: 700;
+            color: #000;
+            line-height: 1.5;
+        }
+        .app-footer span {
+            display: inline-block;
+        }
+        .footer-badge {
+            background: #ffe66d;
+            border: 1.5px solid #000;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 800;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="app-header">
+            <h1>MIERS Converter</h1>
+        </div>
+
+        <div id="tools-grid" class="grid"></div>
+    </div>
+
+    <!-- Footer Copyright & Inovasi -->
+    <footer class="app-footer">
+        © 2026 <b>Miers Kuningan, Artotel Curated</b> • Created with by <span class="footer-badge">IT Trainer 2026</span>
+    </footer>
+
+    <!-- Modal Konversi Utama -->
+    <div id="modal-overlay" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal()">✕</button>
+            <h2 id="modal-title">Konversi File</h2>
+            
+            <div id="drop-zone" class="drop-zone" onclick="selectFiles()">
+                📄 Drag & Drop file ke sini atau <b>Klik untuk Pilih File</b>
+            </div>
+
+            <div id="file-header" class="file-header" style="display: none;">
+                <span>File Terpilih (<span id="file-count">0</span>)</span>
+                <button class="delete-single-btn" onclick="clearAllFiles()">Hapus Semua</button>
+            </div>
+            <div id="file-list" class="file-list" style="display: none;"></div>
+
+            <div class="form-group" id="password-wrapper" style="display: none;">
+                <label for="pdf-password">Password PDF:</label>
+                <input type="password" id="pdf-password" class="form-control" placeholder="Masukkan password">
+            </div>
+
+            <div class="form-group">
+                <label>Folder Penyimpanan Hasil:</label>
+                <div class="btn-row">
+                    <input type="text" id="target-dir-display" class="form-control" readonly placeholder="Pilih folder simpan...">
+                    <button class="btn btn-secondary" onclick="chooseTargetDirectory()">Cari</button>
+                </div>
+            </div>
+
+            <div id="status-box" class="status-box"></div>
+
+            <button id="main-submit-btn" class="btn btn-primary" onclick="handleMainAction()">Lanjut ke Simpan ➔</button>
+        </div>
+    </div>
+
+    <!-- Modal Pop-up Edit Nama File (Khusus 1 File / Merge) -->
+    <div id="modal-savename" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <button class="close-btn" onclick="closeSaveNameModal()">✕</button>
+            <h2 style="font-size: 18px; margin-bottom: 12px;">✏️ Nama File Hasil</h2>
+            <p style="font-size: 13px; font-weight: 600; color: #444; margin-bottom: 12px;">Sesuaikan nama file sebelum disimpan:</p>
+            
+            <div class="form-group">
+                <label for="custom-filename-input">Nama File:</label>
+                <input type="text" id="custom-filename-input" class="form-control" placeholder="Masukkan nama file...">
+            </div>
+
+            <button class="btn btn-primary" onclick="startConversionProcess(true)">🚀 Simpan & Konversi</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedTool = null;
+        let selectedFiles = [];
+        let targetDirectory = "";
+        let allTools = [];
+
+        function getCardClass(toolId) {
+            if (toolId.includes('WORD')) return 'card-word';
+            if (toolId.includes('EXCEL')) return 'card-excel';
+            if (toolId.includes('PPT')) return 'card-ppt';
+            if (toolId.includes('IMAGE') || toolId.includes('JPG')) return 'card-img';
+            if (toolId.includes('PDF_TO_')) return 'card-pdf';
+            return 'card-tool';
+        }
+
+        window.addEventListener('dragover', e => e.preventDefault(), false);
+        window.addEventListener('drop', e => e.preventDefault(), false);
+
+        window.addEventListener('pywebviewready', function() {
+            loadTools();
+            setupDragAndDrop();
+        });
+
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('drop-zone');
+            if (!dropZone) return;
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, e => { e.preventDefault(); dropZone.classList.add('drag-over'); }, false);
+            });
+
+            ['dragleave'].forEach(eventName => {
+                dropZone.addEventListener(eventName, e => { e.preventDefault(); dropZone.classList.remove('drag-over'); }, false);
+            });
+
+            dropZone.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+
+                const files = e.dataTransfer.files;
+                if (!files || files.length === 0) return;
+
+                showStatus('Membaca file...', 'success');
+
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    if (file.path) {
+                        if (!selectedFiles.some(f => f.path === file.path)) {
+                            selectedFiles.push({ path: file.path, name: file.name, size: (file.size / (1024 * 1024)).toFixed(2) });
+                        }
+                    } else {
+                        try {
+                            const base64Str = await readFileAsBase64(file);
+                            const savedFile = await window.pywebview.api.save_dropped_file(file.name, base64Str);
+                            if (savedFile && !selectedFiles.some(f => f.path === savedFile.path)) {
+                                selectedFiles.push(savedFile);
+                            }
+                        } catch (err) { console.error("Error reading file:", err); }
+                    }
+                }
+                hideStatus();
+                renderFileList();
+            }, false);
+        }
+
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function loadTools() {
+            if (!window.pywebview || !window.pywebview.api) return;
+            window.pywebview.api.get_tools().then(tools => {
+                allTools = tools;
+                const grid = document.getElementById('tools-grid');
+                if (!grid) return;
+                grid.innerHTML = '';
+                tools.forEach(tool => {
+                    const card = document.createElement('div');
+                    card.className = `tool-card ${getCardClass(tool.id)}`;
+                    card.onclick = () => openModal(tool);
+                    card.innerHTML = `
+                        <div class="card-header">
+                            <span class="badge">${tool.badge}</span>
+                            <span class="card-title">${tool.title}</span>
+                        </div>
+                        <p class="card-desc">${tool.desc}</p>
+                    `;
+                    grid.appendChild(card);
+                });
+            });
+        }
+
+        function openModal(tool) {
+            selectedTool = tool;
+            selectedFiles = [];
+            
+            document.getElementById('modal-title').innerText = tool.title;
+            renderFileList();
+            hideStatus();
+
+            const passWrapper = document.getElementById('password-wrapper');
+            passWrapper.style.display = (tool.id === 'PROTECT_PDF' || tool.id === 'UNLOCK_PDF') ? 'block' : 'none';
+            document.getElementById('pdf-password').value = '';
+
+            document.getElementById('target-dir-display').value = targetDirectory || 'Klik "Cari" untuk memilih folder';
+            document.getElementById('modal-overlay').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
+        function closeSaveNameModal() { document.getElementById('modal-savename').style.display = 'none'; }
+
+        function selectFiles() {
+            if (!selectedTool) return;
+            window.pywebview.api.open_file_dialog(selectedTool.id).then(files => {
+                if (files && files.length > 0) {
+                    files.forEach(newFile => {
+                        if (!selectedFiles.some(f => f.path === newFile.path)) selectedFiles.push(newFile);
+                    });
+                    hideStatus();
+                    renderFileList();
+                }
+            });
+        }
+
+        function renderFileList() {
+            const listEl = document.getElementById('file-list');
+            const headerEl = document.getElementById('file-header');
+            const countEl = document.getElementById('file-count');
+            const btnEl = document.getElementById('main-submit-btn');
+
+            if (selectedFiles.length === 0) {
+                listEl.style.display = 'none';
+                headerEl.style.display = 'none';
+                if (btnEl) btnEl.innerText = 'Lanjut ke Simpan ➔';
+                return;
+            }
+
+            headerEl.style.display = 'flex';
+            listEl.style.display = 'block';
+            countEl.innerText = selectedFiles.length;
+
+            if (selectedFiles.length > 1 && selectedTool && selectedTool.id !== 'MERGE_PDF') {
+                if (btnEl) btnEl.innerText = 'Mulai Konversi 🚀';
+            } else {
+                if (btnEl) btnEl.innerText = 'Lanjut ke Simpan ➔';
+            }
+
+            listEl.innerHTML = selectedFiles.map((f, index) => `
+                <div class="file-item">
+                    <span class="file-info" title="${f.path}">📄 ${f.name} (${f.size} MB)</span>
+                    <button class="delete-single-btn" onclick="removeSingleFile(${index})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function removeSingleFile(index) {
+            selectedFiles.splice(index, 1);
+            hideStatus();
+            renderFileList();
+        }
+
+        function clearAllFiles() {
+            selectedFiles = [];
+            targetDirectory = "";
+            document.getElementById('target-dir-display').value = 'Klik "Cari" untuk memilih folder';
+            
+            const passInput = document.getElementById('pdf-password');
+            if (passInput) passInput.value = '';
+
+            hideStatus();
+            renderFileList();
+        }
+
+        function chooseTargetDirectory() {
+            window.pywebview.api.select_save_location().then(folder => {
+                if (folder) {
+                    targetDirectory = folder;
+                    document.getElementById('target-dir-display').value = targetDirectory;
+                }
+            });
+        }
+
+        function handleMainAction() {
+            if (selectedFiles.length === 0) {
+                showStatus('Pilih file terlebih dahulu!', 'error');
+                return;
+            }
+
+            if (!targetDirectory) {
+                window.pywebview.api.select_save_location().then(folder => {
+                    if (!folder) return;
+                    targetDirectory = folder;
+                    document.getElementById('target-dir-display').value = targetDirectory;
+                    proceedAction();
+                });
+            } else {
+                proceedAction();
+            }
+        }
+
+        function proceedAction() {
+            if (selectedFiles.length > 1 && selectedTool.id !== 'MERGE_PDF') {
+                startConversionProcess(false);
+            } else {
+                showSaveNameModal();
+            }
+        }
+
+        function showSaveNameModal() {
+            const firstFile = selectedFiles[0].name;
+            const dotIdx = firstFile.lastIndexOf('.');
+            const baseName = dotIdx !== -1 ? firstFile.substring(0, dotIdx) : firstFile;
+            const targetExt = selectedTool ? (selectedTool.target_ext || '') : '';
+
+            const defaultName = (selectedTool && selectedTool.id === 'MERGE_PDF') 
+                ? `Merged_Result${targetExt}` 
+                : `${baseName}_converted${targetExt}`;
+
+            document.getElementById('custom-filename-input').value = defaultName;
+            document.getElementById('modal-savename').style.display = 'flex';
+        }
+
+        function startConversionProcess(useCustomName = false) {
+            let customName = "";
+            if (useCustomName) {
+                customName = document.getElementById('custom-filename-input').value.trim();
+                closeSaveNameModal();
+            }
+
+            const paths = selectedFiles.map(f => f.path);
+            const password = document.getElementById('pdf-password').value;
+
+            showStatus('Sedang memproses & menyimpan file...', 'success');
+
+            window.pywebview.api.execute_conversion(selectedTool.id, paths, targetDirectory, customName, password).then(res => {
+                if (res.status === 'success') {
+                    showStatus(`
+                        ✅ Selesai!<br>
+                        Waktu: ${res.processing_time} | Status: ${res.size_savings}<br>
+                        <i>File Explorer telah dibuka otomatis mengarahkan ke file baru.</i>
+                    `, 'success');
+                } else {
+                    showStatus(`❌ Gagal: ${res.message}`, 'error');
+                }
+            });
+        }
+
+        function showStatus(msg, type) {
+            const box = document.getElementById('status-box');
+            box.style.display = 'block';
+            box.className = `status-box ${type === 'success' ? 'status-success' : 'status-error'}`;
+            box.innerHTML = msg;
+        }
+
+        function hideStatus() {
+            const box = document.getElementById('status-box');
+            box.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

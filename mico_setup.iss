@@ -3,8 +3,8 @@
 ; Non-commercial use only.
 
 #define MyAppName "MiCO File Converter"
-#define MyAppVersion "2.8"
-#define MyAppPublisher "IT Trainee 2026"
+#define MyAppVersion "3.2"
+#define MyAppPublisher "Miers Kuningan - IT Trainer 2026"
 #define MyAppURL "https://github.com/biopolar"
 #define MyAppExeName "app.exe"
 #define DoubleAmp(Value) StringChange(Value, "&", "&&")
@@ -12,30 +12,23 @@
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
-; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{CCF5686F-0CE2-407A-AD6C-2E3893919B6D}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-;AppVerName={cm:NameAndVersion,{#EscapeConstArgument(MyAppName)},{#EscapeConstArgument(MyAppVersion)}}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
-; "ArchitecturesAllowed=x64compatible" specifies that Setup cannot run on anything but x64 and Windows 11 on Arm.
+
 ArchitecturesAllowed=x64compatible
-; "ArchitecturesInstallIn64BitMode=x64compatible" requests that the install be done in "64-bit mode" on x64 or Windows 11 on Arm.
-; This means it should use the native 64-bit Program Files directory and the 64-bit view of the registry.
 ArchitecturesInstallIn64BitMode=x64compatible
-; Uncomment the following line to use a 64-bit installer.
-;SetupArchitecture=x64
+
 DisableProgramGroupPage=yes
-; Uncomment the following line to run in non administrative install mode (install for current user only).
-;PrivilegesRequired=lowest
-OutputDir=C:\MiCO\Output
+OutputDir=Output
 OutputBaseFilename=MiCO_File_Converter_Setup
-SetupIconFile=C:\MiCO\app_icon.ico
+SetupIconFile=app_icon.ico
 SolidCompression=yes
 WizardStyle=modern dynamic
 
@@ -46,9 +39,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\MiCO\dist\app\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\MiCO\dist\app\_internal\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; NOTE: Don't use "Flags: ignoreversion" on any shared system files.
+; Mengambil seluruh isi folder dist/app hasil build PyInstaller secara otomatis
+Source: "dist\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -56,4 +48,3 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#DoubleAmp(MyAppName)}}"; Flags: nowait postinstall skipifsilent
-
