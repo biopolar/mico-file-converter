@@ -3,7 +3,7 @@
 ; Non-commercial use only.
 
 #define MyAppName "MiCO File Converter"
-#define MyAppVersion "3.2"
+#define MyAppVersion "3.6"
 #define MyAppPublisher "Miers Kuningan - IT Trainer 2026"
 #define MyAppURL "https://github.com/biopolar"
 #define MyAppExeName "app.exe"
