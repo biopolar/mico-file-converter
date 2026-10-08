@@ -7,6 +7,9 @@ def convert_word_to_pdf(file_paths, target_dir):
     if total == 0:
         return 0, 0, "Tidak ada file yang dipilih."
     
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir, exist_ok=True)
+
     success = 0
 
     # --- SISTEM OPERASI WINDOWS ---
@@ -66,6 +69,12 @@ def convert_word_to_pdf(file_paths, target_dir):
 
     # --- SISTEM OPERASI MACOS ---
     elif sys.platform == "darwin":
+        # Jalur resmi executable LibreOffice jika terinstall di macOS
+        libreoffice_path = "soffice"
+        mac_lo_app = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+        if os.path.exists(mac_lo_app):
+            libreoffice_path = mac_lo_app
+
         for docx_path in file_paths:
             if not os.path.exists(docx_path):
                 continue
@@ -74,24 +83,22 @@ def convert_word_to_pdf(file_paths, target_dir):
             name, _ = os.path.splitext(base_name)
             pdf_path = os.path.abspath(os.path.join(target_dir, f"{name}.pdf"))
 
-            # Escaping tanda petik ganda agar aman di AppleScript
             safe_docx = abs_docx.replace('"', '\\"')
             safe_pdf = pdf_path.replace('"', '\\"')
 
             converted = False
 
             # Opsi 1: Microsoft Word Mac via AppleScript
-            applescript = f'''
+            applescript_word = f'''
             tell application "Microsoft Word"
-                set visibility to false
-                open POSIX file "{safe_docx}"
-                set theDoc to active document
-                save as theDoc file format format PDF file name POSIX file "{safe_pdf}"
-                close theDoc saving no
+                set display alerts to false
+                open (POSIX file "{safe_docx}")
+                save as active document file name "{safe_pdf}" file format format PDF
+                close active document saving no
             end tell
             '''
             try:
-                res = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True, timeout=60)
+                res = subprocess.run(["osascript", "-e", applescript_word], capture_output=True, text=True, timeout=60)
                 if res.returncode == 0 and os.path.exists(pdf_path):
                     success += 1
                     converted = True
@@ -101,9 +108,28 @@ def convert_word_to_pdf(file_paths, target_dir):
             if converted:
                 continue
 
-            # Opsi 2: Fallback LibreOffice jika MS Word tidak ada di Mac
+            # Opsi 2: Apple Pages (Bawaan macOS) via AppleScript
+            applescript_pages = f'''
+            tell application "Pages"
+                set theDoc to open (POSIX file "{safe_docx}")
+                export theDoc to (POSIX file "{safe_pdf}") as PDF
+                close theDoc saving no
+            end tell
+            '''
             try:
-                lo_res = subprocess.run(["soffice", "--headless", "--convert-to", "pdf", "--outdir", target_dir, abs_docx], capture_output=True, timeout=60)
+                res = subprocess.run(["osascript", "-e", applescript_pages], capture_output=True, text=True, timeout=60)
+                if res.returncode == 0 and os.path.exists(pdf_path):
+                    success += 1
+                    converted = True
+            except Exception:
+                pass
+
+            if converted:
+                continue
+
+            # Opsi 3: LibreOffice di macOS
+            try:
+                lo_res = subprocess.run([libreoffice_path, "--headless", "--convert-to", "pdf", "--outdir", target_dir, abs_docx], capture_output=True, timeout=60)
                 if lo_res.returncode == 0 and os.path.exists(pdf_path):
                     success += 1
                     converted = True
@@ -113,7 +139,7 @@ def convert_word_to_pdf(file_paths, target_dir):
         if success > 0:
             return success, total, ""
         else:
-            return 0, total, "Konversi Word to PDF di Mac membutuhkan Microsoft Word atau LibreOffice yang terinstall."
+            return 0, total, "Gagal mengonversi file Word ke PDF di Mac. Pastikan Microsoft Word atau Apple Pages dapat dibuka."
 
     else:
-        return 0, total, "Sistem operasi tidak didukung."
+        return 0, total, "Sistem operasi tidak didukung."   
